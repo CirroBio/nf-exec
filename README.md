@@ -25,7 +25,7 @@ most Debian `-slim` images.
 | Parameter | Description |
 |---|---|
 | `--command` | Shell commands to run. Written to a file and executed, so nothing needs escaping |
-| `--input_datasets` | Comma-separated dataset roots. `/data` is appended to each, and each is fetched with `aws s3 cp --recursive` |
+| `--input_datasets` | Comma-separated datasets, in staging order. Either an S3 root (`s3://bucket/datasets/<id>`) or a bare dataset ID, which is resolved against the same project bucket as `--output_dir`. `/data` is appended to each, and each is fetched with `aws s3 cp --recursive` |
 | `--output_dir` | Where `output/` is published |
 | `--container` | Image to run in |
 | `--cpus` | CPUs for the task |

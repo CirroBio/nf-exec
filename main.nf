@@ -76,9 +76,16 @@ workflow {
 
     command_ch = Channel.of(params.command).collectFile(name: 'command.sh')
 
-    // One selected dataset per line, in the order the form recorded them. Emitted as
-    // a single string so collectFile has nothing to interleave or re-sort.
+    // Cirro's dataset picker stores a full S3 root, but the read API an assistant has
+    // exposes only dataset IDs, so a bare ID has to work too. Every dataset in a project
+    // shares the output's bucket, so the prefix is recoverable from output_dir. A token
+    // with no separator is an ID; anything else is already a path.
+    def datasets_root = params.output_dir.toString().replaceFirst('/datasets/.*$', '') + '/datasets'
     def uris = params.input_datasets.toString().tokenize(',')
+        .collect { it.contains('/') ? it : "${datasets_root}/${it}" }
+
+    // One dataset per line, in the order the form recorded them. Emitted as a single
+    // string so collectFile has nothing to interleave or re-sort.
     inputs_ch = Channel
         .of(uris.join('\n'))
         .collectFile(name: 'inputs.txt', newLine: true)
