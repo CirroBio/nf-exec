@@ -38,12 +38,19 @@ Besides whatever the command writes, every run produces:
 
 | File | Contents |
 |---|---|
-| `_cirro/command.sh` | The exact bytes executed |
-| `_cirro/command.log` | stdout and stderr, interleaved |
-| `_cirro/exit_code.txt` | The command's exit status |
-| `_cirro/inputs.tsv` | Folder number and source URI for each staged dataset |
+| `.command.sh` | The exact bytes executed |
+| `.command.log` | stdout and stderr, interleaved |
+| `.exitcode` | The command's exit status |
+| `.inputs.tsv` | Folder number and source URI for each staged dataset |
 
-`_cirro/inputs.tsv` is the only record of which dataset landed in which numbered folder.
+These sit beside the command's own output rather than in a subfolder, and take Nextflow's
+own names for the same things. The leading dot keeps them out of the way and means a
+command writing `output/command.log` cannot collide with them.
+
+`.inputs.tsv` is the only record of which dataset landed in which numbered folder.
+
+Publishing them needs `hidden: true` on the `path` output — a glob silently drops dotfiles,
+so without it the whole record is published as nothing at all.
 
 ## Variables set for the command
 

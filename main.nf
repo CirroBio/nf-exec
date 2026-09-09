@@ -21,19 +21,21 @@ process EXEC {
         path 'inputs.txt'
         path 'command.sh'
 
+    // hidden: true is required. A path output glob silently drops dotfiles, so
+    // without it the whole provenance record is published as nothing at all.
     output:
-        path 'output/**', optional: true
-        path 'output/_cirro/exit_code.txt', emit: status
+        path 'output/**', hidden: true, optional: true
+        path 'output/.exitcode', hidden: true, emit: status
 
     script:
     """
-    mkdir -p inputs output/_cirro
-    cp command.sh output/_cirro/command.sh
-    : > output/_cirro/inputs.tsv
+    mkdir -p inputs output
+    cp command.sh output/.command.sh
+    : > output/.inputs.tsv
 
     # Staging runs before the block that swallows the exit status, so a failed
     # transfer fails the task rather than handing the command an empty folder.
-    # The folder number is the line number, and inputs.tsv is the only record of
+    # The folder number is the line number, and .inputs.tsv is the only record of
     # which dataset landed where.
     i=0
     while read -r uri; do
@@ -41,7 +43,7 @@ process EXEC {
         i=\$((i + 1))
         mkdir -p "inputs/\$i"
         "${aws_cli}" s3 cp --recursive --quiet "\$uri/data" "inputs/\$i/"
-        printf '%s\\t%s\\n' "\$i" "\$uri" >> output/_cirro/inputs.tsv
+        printf '%s\\t%s\\n' "\$i" "\$uri" >> output/.inputs.tsv
     done < inputs.txt
 
     # conda packages embed a fixed-length prefix placeholder, and a Nextflow work
@@ -58,11 +60,11 @@ process EXEC {
     # The task exits 0 whatever the command did, so publishDir still copies the log
     # and any partial output. The workflow raises the failure afterwards.
     set +e
-    ( set -euo pipefail; bash ./command.sh ) 2>&1 | tee output/_cirro/command.log
+    ( set -euo pipefail; bash ./command.sh ) 2>&1 | tee output/.command.log
     rc=\${PIPESTATUS[0]}
     set -e
 
-    echo "\$rc" > output/_cirro/exit_code.txt
+    echo "\$rc" > output/.exitcode
     """
 }
 
@@ -96,6 +98,6 @@ workflow {
         .map { it.text.trim() as Integer }
         .filter { it != 0 }
         .subscribe { rc ->
-            error("The command exited with status ${rc}. See _cirro/command.log in the output dataset.")
+            error("The command exited with status ${rc}. See .command.log in the output dataset.")
         }
 }
