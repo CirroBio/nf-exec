@@ -25,7 +25,7 @@ most Debian `-slim` images.
 | Parameter | Description |
 |---|---|
 | `--command` | Shell commands to run. Written to a file and executed, so nothing needs escaping |
-| `--input_datasets` | Comma-separated datasets, in staging order. Either an S3 root (`s3://bucket/datasets/<id>`) or a bare dataset ID, which is resolved against the same project bucket as `--output_dir`. `/data` is appended to each, and each is fetched with `aws s3 cp --recursive` |
+| `--input_datasets` | Dataset roots in staging order, as a list or a comma-separated string. `/data` is appended to each. Under Cirro this arrives as a list of S3 roots; `preprocess.py` resolves the form's selection and any bare dataset IDs before the workflow sees them |
 | `--output_dir` | Where `output/` is published |
 | `--container` | Image to run in |
 | `--cpus` | CPUs for the task |
@@ -72,9 +72,10 @@ nextflow run CirroBio/nf-exec \
     --command 'wc -l inputs/1/*.csv > output/counts.txt'
 ```
 
-Staging uses the AWS CLI at `aws.batch.cliPath` when that is configured — Cirro mounts its
-own CLI into every task container, so the image does not need one — and falls back to `aws`
-on `PATH` otherwise.
+Nextflow does the staging, so the image needs nothing of its own for the transfer. Inputs
+are staged with `stageInMode 'copy'`: on Batch they are downloaded anyway, but a
+shared-filesystem executor would symlink them and `find inputs -type f` would then find
+nothing.
 
 Cirro supplies its own Nextflow config at run time via `-config`, setting the executor, work
 directory, queue and job role, so this repository intentionally ships no `nextflow.config`.

@@ -75,23 +75,14 @@ workflow {
 
     command_ch = Channel.of(params.command).collectFile(name: 'command.sh')
 
-    // Cirro's dataset picker stores a full S3 root, but the read API an assistant has
-    // exposes only dataset IDs, so a bare ID has to work too. Every dataset in a project
-    // shares the output's bucket, so the prefix is recoverable from output_dir. A token
-    // with no separator is an ID; anything else is already a path.
-    def datasets_root = params.output_dir.toString().replaceFirst('/datasets/.*$', '') + '/datasets'
-
-    // A list from preprocess.py or from an API caller; a comma-joined string when the
-    // workflow is driven directly, which is what the form widget submits before
-    // preprocess.py normalises it.
-    def selected = params.input_datasets instanceof List
-        ? params.input_datasets
-        : params.input_datasets.toString().tokenize(',')
-
-    def uris = selected
+    // Under Cirro, preprocess.py has already turned the selection into a list of S3
+    // roots, whichever shape the form or an API caller supplied. Run directly, a
+    // comma-joined string is the convenient thing to type.
+    def uris = (params.input_datasets instanceof List
+            ? params.input_datasets
+            : params.input_datasets.toString().tokenize(','))
         .collect { it.toString().trim() }
         .findAll { it }
-        .collect { it.contains('/') ? it : "${datasets_root}/${it}" }
 
     // Nextflow does the transfer, so a failed download is a Nextflow error with its
     // retries and reporting rather than shell of ours, and the task container needs
