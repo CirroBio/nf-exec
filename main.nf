@@ -2,12 +2,6 @@
 
 nextflow.enable.dsl = 2
 
-// Cirro mounts the host's AWS CLI into every task container at the path it sets as
-// aws.batch.cliPath, but does not put it on PATH. Read the configured value rather
-// than hard-coding it; fall back to PATH for a local-agent environment, which has
-// no such mount.
-aws_cli = session.config.navigate('aws.batch.cliPath') ?: 'aws'
-
 process EXEC {
     container params.container
     cpus     params.cpus
@@ -17,7 +11,13 @@ process EXEC {
     publishDir params.output_dir, mode: 'copy', overwrite: true,
                saveAs: { it.replaceFirst('^output/', '') }
 
+    // On Batch the inputs are downloaded, but a shared-filesystem executor would
+    // symlink them, and then a command as ordinary as `find inputs -type f` finds
+    // nothing. An arbitrary command must not see a different tree by executor.
+    stageInMode 'copy'
+
     input:
+        path staged, stageAs: 'staged/d*'
         path 'inputs.txt'
         path 'command.sh'
 
@@ -28,23 +28,20 @@ process EXEC {
         path 'output/.exitcode', hidden: true, emit: status
 
     script:
+    def n = staged instanceof List ? staged.size() : 1
     """
     mkdir -p inputs output
     cp command.sh output/.command.sh
-    : > output/.inputs.tsv
 
-    # Staging runs before the block that swallows the exit status, so a failed
-    # transfer fails the task rather than handing the command an empty folder.
-    # The folder number is the line number, and .inputs.tsv is the only record of
-    # which dataset landed where.
-    i=0
-    while read -r uri; do
-        [ -n "\$uri" ] || continue
-        i=\$((i + 1))
-        mkdir -p "inputs/\$i"
-        "${aws_cli}" s3 cp --recursive --quiet "\$uri/data" "inputs/\$i/"
-        printf '%s\\t%s\\n' "\$i" "\$uri" >> output/.inputs.tsv
-    done < inputs.txt
+    # Nextflow names a single staged item 'd' and several 'd1'..'dN', so the layout
+    # would differ between a one-dataset and a two-dataset run. Normalise to
+    # inputs/1..N, and pair each with its source in the same order.
+    if [ ${n} -eq 1 ]; then
+        mv staged/d inputs/1
+    else
+        for i in \$(seq 1 ${n}); do mv "staged/d\$i" "inputs/\$i"; done
+    fi
+    awk '{ print NR "\\t" \$0 }' inputs.txt > output/.inputs.tsv
 
     # conda packages embed a fixed-length prefix placeholder, and a Nextflow work
     # directory is far too deep to fit inside it. Without this, 'pixi exec' fails
@@ -86,13 +83,19 @@ workflow {
     def uris = params.input_datasets.toString().tokenize(',')
         .collect { it.contains('/') ? it : "${datasets_root}/${it}" }
 
-    // One dataset per line, in the order the form recorded them. Emitted as a single
-    // string so collectFile has nothing to interleave or re-sort.
+    // Nextflow does the transfer, so a failed download is a Nextflow error with its
+    // retries and reporting rather than shell of ours, and the task container needs
+    // nothing of its own.
+    staged_ch = Channel.of(uris.collect { file("${it}/data", type: 'dir') })
+
+    // One dataset per line, in the same order, so the task can pair line N with the
+    // folder it became. Emitted as a single string so collectFile has nothing to
+    // interleave or re-sort.
     inputs_ch = Channel
         .of(uris.join('\n'))
         .collectFile(name: 'inputs.txt', newLine: true)
 
-    EXEC(inputs_ch, command_ch)
+    EXEC(staged_ch, inputs_ch, command_ch)
 
     EXEC.out.status
         .map { it.text.trim() as Integer }
