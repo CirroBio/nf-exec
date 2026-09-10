@@ -80,7 +80,17 @@ workflow {
     // shares the output's bucket, so the prefix is recoverable from output_dir. A token
     // with no separator is an ID; anything else is already a path.
     def datasets_root = params.output_dir.toString().replaceFirst('/datasets/.*$', '') + '/datasets'
-    def uris = params.input_datasets.toString().tokenize(',')
+
+    // A list from preprocess.py or from an API caller; a comma-joined string when the
+    // workflow is driven directly, which is what the form widget submits before
+    // preprocess.py normalises it.
+    def selected = params.input_datasets instanceof List
+        ? params.input_datasets
+        : params.input_datasets.toString().tokenize(',')
+
+    def uris = selected
+        .collect { it.toString().trim() }
+        .findAll { it }
         .collect { it.contains('/') ? it : "${datasets_root}/${it}" }
 
     // Nextflow does the transfer, so a failed download is a Nextflow error with its
