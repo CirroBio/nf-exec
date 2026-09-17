@@ -1,0 +1,63 @@
+{
+  "form": {
+    "type": "object",
+    "required": [
+      "input_datasets",
+      "command"
+    ],
+    "properties": {
+      "input_datasets": {
+        "title": "Input datasets",
+        "type": "string",
+        "pathType": "dataset",
+        "multiple": true,
+        "description": "Datasets to stage for the command. They are placed in selection order as ./inputs/1, ./inputs/2, and so on, each keeping its own directory structure. Accepts a dataset ID as well as an S3 root."
+      },
+      "command": {
+        "title": "Command",
+        "type": "string",
+        "description": "Shell commands to run against the selected datasets. Read from ./inputs/1, ./inputs/2, ... and write anything you want to keep to ./output, which becomes the new dataset. Runs under bash with 'set -euo pipefail'; a non-zero exit marks the run failed but still saves the log."
+      },
+      "container": {
+        "title": "Container image",
+        "type": "string",
+        "default": "ghcr.io/prefix-dev/pixi:0.80.0",
+        "description": "Any public Docker image that has bash and ps installed. A missing ps fails the task before your command runs, which rules out most '-slim' images. The default carries pixi, so 'pixi exec -c conda-forge -c bioconda --spec TOOL -- TOOL ...' fetches anything you need at run time."
+      },
+      "cpus": {
+        "title": "CPUs",
+        "type": "integer",
+        "default": 2,
+        "minimum": 1,
+        "maximum": 64
+      },
+      "memory_gb": {
+        "title": "Memory (GB)",
+        "type": "integer",
+        "default": 8,
+        "minimum": 1,
+        "maximum": 256
+      },
+      "timeout_hours": {
+        "title": "Time limit (hours)",
+        "type": "integer",
+        "default": 12,
+        "minimum": 1,
+        "maximum": 168,
+        "description": "The run is killed after this long. Raise it for long jobs; lower it to fail fast."
+      }
+    }
+  },
+  "ui": {
+    "command": {
+      "ui:widget": "textarea",
+      "ui:options": {
+        "rows": 14
+      },
+      "ui:placeholder": "wc -l inputs/1/*.csv > output/line_counts.txt"
+    },
+    "container": {
+      "ui:placeholder": "quay.io/biocontainers/samtools:1.21--h50ea8bc_0"
+    }
+  }
+}

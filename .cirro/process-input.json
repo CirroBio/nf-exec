@@ -1,0 +1,9 @@
+{
+  "command": "$.dataset.params.command",
+  "container": "$.dataset.params.container",
+  "cpus": "$.dataset.params.cpus",
+  "memory_gb": "$.dataset.params.memory_gb",
+  "timeout_hours": "$.dataset.params.timeout_hours",
+  "input_datasets": "$.dataset.params.input_datasets",
+  "output_dir": "$.dataset.dataPath"
+}
